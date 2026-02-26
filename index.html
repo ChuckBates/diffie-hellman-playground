@@ -40,7 +40,8 @@ Two people can agree on a shared secret without ever sending the secret itself.
 
 <div class="box">
   <h3>Step 1: Choose Your Secret Number</h3>
-  <input id="private" placeholder="Pick a number (e.g. 7)" />
+  <button onclick="randomSecret()">Random Secret Number</button>
+  <input id="private" placeholder="Generate Random Secret Number" readonly/>
 
   <button onclick="generatePublic()">Generate Public Value</button>
 
@@ -64,8 +65,8 @@ Two people can agree on a shared secret without ever sending the secret itself.
 
 <script>
   // Fixed public numbers (small for demo purposes)
-  const P = 23n;   // prime number
-  const G = 5n;    // base number
+  const P = 1000003n;   // prime number
+  const G = 2n;    // base number
 
   function modPow(base, exp, mod) {
     let result = 1n;
@@ -78,6 +79,10 @@ Two people can agree on a shared secret without ever sending the secret itself.
       base = (base * base) % mod;
     }
     return result;
+  }
+
+  function randomSecret() {
+    document.getElementById("private").value = Math.floor(Math.randon() * 20 + 2);
   }
 
   function generatePublic() {
