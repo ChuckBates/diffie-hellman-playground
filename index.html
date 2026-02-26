@@ -82,7 +82,7 @@ Two people can agree on a shared secret without ever sending the secret itself.
   }
 
   function randomSecret() {
-    document.getElementById("private").value = Math.floor(Math.random() * 20 + 2);
+    document.getElementById("private").value = Math.floor(Math.random() * 10000 + 1000);
   }
 
   function generatePublic() {
