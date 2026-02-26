@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Diffie–Hellman Playground</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; line-height: 1.35; }
+    .wrap { max-width: 980px; margin: 0 auto; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    p { margin: 8px 0; opacity: .9; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .card { border: 1px solid rgba(127,127,127,.35); border-radius: 14px; padding: 16px; background: rgba(127,127,127,.06); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 10px 0; }
+    label { font-size: .9rem; opacity: .9; }
+    input, select, button, textarea {
+      font: inherit; padding: 10px 12px; border-radius: 10px;
+      border: 1px solid rgba(127,127,127,.35); background: transparent;
+    }
+    textarea { width: 100%; min-height: 64px; resize: vertical; }
+    button { cursor: pointer; }
+    button.primary { border-color: rgba(0,120,255,.6); }
+    .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .tiny { font-size: .85rem; opacity: .85; }
+    .ok { color: #1a7f37; }
+    .warn { color: #b54708; }
+    .err { color: #cf222e; }
+    .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(127,127,127,.35); }
+    .split { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+    .hr { height: 1px; background: rgba(127,127,127,.25); margin: 12px 0; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="split">
+    <div>
+      <h1>Diffie–Hellman Playground</h1>
+      <p>Pick a private exponent, compute a public value, exchange it with a partner, and watch both sides derive the same shared secret.</p>
+      <p class="tiny warn">This is a learning toy. Real DH uses vetted groups/curves, strong randomness, and authentication (certs) to prevent man-in-the-middle.</p>
+    </div>
+    <div class="pill tiny mono" id="status">Ready</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label>Demo group (recommended)</label>
+      <select id="preset">
+        <option value="23,5">Tiny (p=23, g=5) — easy to do by hand</option>
+        <option value="7919,10">Small (p=7919, g=10) — still fast</option>
+        <option value="104729,2">Medium (p=104729, g=2) — larger prime</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+
+    <div id="customGroup" style="display:none">
+      <div class="row">
+        <label>Prime modulus p (decimal)</label>
+        <input id="p" class="mono" placeholder="e.g. 104729" />
+      </div>
+      <div class="row">
+        <label>Generator g (decimal)</label>
+        <input id="g" class="mono" placeholder="e.g. 2" />
+      </div>
+    </div>
+
+    <div class="btnrow">
+      <button id="apply" class="primary">Apply group</button>
+      <button id="shareLink">Share link (p,g,A)</button>
+      <button id="reset">Reset</button>
+    </div>
+
+    <div class="hr"></div>
+    <div class="tiny">
+      Current group:
+      <span class="mono">p=<span id="pShow"></span></span>,
+      <span class="mono">g=<span id="gShow"></span></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- You -->
+    <div class="card">
+      <h2 style="margin:0 0 8px;">You</h2>
+      <p class="tiny">Choose your private exponent <span class="mono">a</span>, compute your public value <span class="mono">A = g^a mod p</span>, share <span class="mono">A</span> publicly.</p>
+
+      <div class="row">
+        <label>Your private exponent a (keep secret)</label>
+        <input id="a" class="mono" placeholder="e.g. 12345" />
+      </div>
+
+      <div class="btnrow">
+        <button id="randA">Randomize a</button>
+        <button id="computeA" class="primary">Compute A</button>
+      </div>
+
+      <div class="row">
+        <label>Your public value A (share this)</label>
+        <textarea id="A" class="mono" readonly placeholder="(Compute A)"></textarea>
+      </div>
+
+      <div class="row">
+        <label>Partner’s public value B (paste theirs here)</label>
+        <textarea id="B" class="mono" placeholder="Paste partner's B"></textarea>
+      </div>
+
+      <div class="btnrow">
+        <button id="computeS" class="primary">Compute shared secret S = B^a mod p</button>
+      </div>
+
+      <div class="row">
+        <label>Your derived shared secret S</label>
+        <textarea id="S" class="mono" readonly placeholder="(Compute S)"></textarea>
+      </div>
+    </div>
+
+    <!-- Partner instructions -->
+    <div class="card">
+      <h2 style="margin:0 0 8px;">Partner (instructions)</h2>
+      <ol>
+        <li>Open this same page.</li>
+        <li>Use the same <span class="mono">p</span> and <span class="mono">g</span> (use preset or your shared link).</li>
+        <li>Pick a private exponent <span class="mono">b</span>.</li>
+        <li>Compute <span class="mono">B = g^b mod p</span>.</li>
+        <li>Publicly exchange <span class="mono">A</span> and <span class="mono">B</span>.</li>
+        <li>Each computes:
+          <ul>
+            <li>You compute <span class="mono">S = B^a mod p</span></li>
+            <li>They compute <span class="mono">S = A^b mod p</span></li>
+          </ul>
+        </li>
+        <li>Say your <span class="mono">S</span> out loud. It should match.</li>
+      </ol>
+
+      <div class="hr"></div>
+      <p class="tiny"><b>Important caveat:</b> This demo does not authenticate identities. A man-in-the-middle can establish separate secrets with each side if they can modify messages. TLS prevents that with certificates/signatures.</p>
+
+      <div class="hr"></div>
+      <details>
+        <summary>What’s happening under the hood?</summary>
+        <p class="tiny mono">
+          A = g^a mod p<br/>
+          B = g^b mod p<br/>
+          You compute S = B^a = (g^b)^a = g^(ab) mod p<br/>
+          They compute S = A^b = (g^a)^b = g^(ab) mod p
+        </p>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- BigInt helpers ----------
+  const $ = (id) => document.getElementById(id);
+
+  function setStatus(text, kind = "ok") {
+    const el = $("status");
+    el.textContent = text;
+    el.className = `pill tiny mono ${kind}`;
+  }
+
+  function parseBigIntStrict(s, fieldName) {
+    const t = (s || "").trim();
+    if (!t) throw new Error(`${fieldName} is required`);
+    if (!/^[0-9]+$/.test(t)) throw new Error(`${fieldName} must be a non-negative integer (decimal)`);
+    return BigInt(t);
+  }
+
+  // Fast modular exponentiation: base^exp mod mod
+  function modPow(base, exp, mod) {
+    if (mod === 1n) return 0n;
+    let result = 1n;
+    let b = ((base % mod) + mod) % mod;
+    let e = exp;
+    while (e > 0n) {
+      if (e & 1n) result = (result * b) % mod;
+      e >>= 1n;
+      b = (b * b) % mod;
+    }
+    return result;
+  }
+
+  // Generate a random BigInt in [min, max] inclusive
+  function randomBigInt(min, max) {
+    // NOTE: Uses crypto.getRandomValues; fine for demo purposes.
+    // For real crypto, you'd use established libraries and protocols.
+    if (max < min) throw new Error("bad range");
+    const range = max - min + 1n;
+    const bits = range.toString(2).length;
+    const bytes = Math.ceil(bits / 8);
+    const mask = (1n << BigInt(bits)) - 1n;
+
+    while (true) {
+      const buf = new Uint8Array(bytes);
+      crypto.getRandomValues(buf);
+      let x = 0n;
+      for (const byte of buf) x = (x << 8n) + BigInt(byte);
+      x = x & mask;
+      if (x < range) return min + x;
+    }
+  }
+
+  // ---------- App state ----------
+  let P = 23n;
+  let G = 5n;
+
+  function syncGroupUI() {
+    $("pShow").textContent = P.toString();
+    $("gShow").textContent = G.toString();
+  }
+
+  function readGroupFromUI() {
+    const preset = $("preset").value;
+    if (preset !== "custom") {
+      const [pStr, gStr] = preset.split(",");
+      return { p: BigInt(pStr), g: BigInt(gStr) };
+    }
+    const p = parseBigIntStrict($("p").value, "p");
+    const g = parseBigIntStrict($("g").value, "g");
+    return { p, g };
+  }
+
+  function loadFromQueryParams() {
+    const url = new URL(window.location.href);
+    const p = url.searchParams.get("p");
+    const g = url.searchParams.get("g");
+    const A = url.searchParams.get("A");
+    if (p && g) {
+      try {
+        P = parseBigIntStrict(p, "p");
+        G = parseBigIntStrict(g, "g");
+        syncGroupUI();
+        setStatus("Loaded p,g from link", "ok");
+      } catch {
+        // ignore
+      }
+    }
+    if (A) {
+      $("B").value = A; // convenience: partner can paste your A as their B field from link
+    }
+  }
+
+  // ---------- Wire up UI ----------
+  $("preset").addEventListener("change", () => {
+    $("customGroup").style.display = $("preset").value === "custom" ? "block" : "none";
+  });
+
+  $("apply").addEventListener("click", () => {
+    try {
+      const { p, g } = readGroupFromUI();
+      if (p <= 2n) throw new Error("p must be > 2");
+      if (g <= 1n || g >= p) throw new Error("g must be in [2, p-1]");
+      P = p; G = g;
+      syncGroupUI();
+      setStatus("Group applied", "ok");
+    } catch (e) {
+      setStatus(e.message, "err");
+    }
+  });
+
+  $("randA").addEventListener("click", () => {
+    try {
+      // pick a in [2, p-2]
+      const a = randomBigInt(2n, P - 2n);
+      $("a").value = a.toString();
+      setStatus("Generated random a", "ok");
+    } catch (e) {
+      setStatus(e.message, "err");
+    }
+  });
+
+  $("computeA").addEventListener("click", () => {
+    try {
+      const a = parseBigIntStrict($("a").value, "a");
+      if (a <= 1n) throw new Error("a must be > 1");
+      const A = modPow(G, a, P);
+      $("A").value = A.toString();
+      setStatus("Computed A (share it)", "ok");
+    } catch (e) {
+      setStatus(e.message, "err");
+    }
+  });
+
+  $("computeS").addEventListener("click", () => {
+    try {
+      const a = parseBigIntStrict($("a").value, "a");
+      const B = parseBigIntStrict($("B").value, "B");
+      const S = modPow(B, a, P);
+      $("S").value = S.toString();
+      setStatus("Computed shared secret S", "ok");
+    } catch (e) {
+      setStatus(e.message, "err");
+    }
+  });
+
+  $("shareLink").addEventListener("click", async () => {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("p", P.toString());
+      url.searchParams.set("g", G.toString());
+      const A = ($("A").value || "").trim();
+      if (A) url.searchParams.set("A", A);
+      const link = url.toString();
+      await navigator.clipboard.writeText(link);
+      setStatus("Copied share link to clipboard", "ok");
+    } catch (e) {
+      setStatus("Could not copy link (browser blocked clipboard). You can manually copy the URL.", "warn");
+    }
+  });
+
+  $("reset").addEventListener("click", () => {
+    window.location.href = window.location.origin + window.location.pathname;
+  });
+
+  // Initialize
+  syncGroupUI();
+  loadFromQueryParams();
+</script>
+</body>
+</html>
